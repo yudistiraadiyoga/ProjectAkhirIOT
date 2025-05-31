@@ -11,6 +11,8 @@ const char *password = "";    // Diisi Password Wifi
 const char *mqtt_broker = "broker.emqx.io"; // GANTI DENGAN IP BROKER MQTT ANDA (misal "192.168.1.100")
 const char *topic_publish = "71220830"; // Topik untuk mempublikasikan data sensor (JSON)
 const int mqtt_port = 1883;
+const char *mqtt_username = ""; // KOSONGKAN "" JIKA TIDAK ADA USERNAME/PASSWORD
+const char *mqtt_password = ""; // KOSONGKAN "" JIKA TIDAK ADA USERNAME/PASSWORD
 
 const char *mqtt_client_id_prefix = "esp8266-sensor-"; // ID unik, akan ditambah MAC address
 
