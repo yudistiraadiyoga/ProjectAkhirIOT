@@ -1,12 +1,25 @@
 #include <ESP8266WiFi.h>
 #include <espnow.h>
+#include <Servo.h>
 
 // Pin relay motor
 const int relayMotorKiri = 5;   // D1
 const int relayMotorKanan = 4;  // D2
 
+// Servo pin
+const int servoPin = 15;  // D8
+Servo myServo;
+
+// Struktur data yang diterima dari transmitter
+typedef struct struct_message {
+  char command[10];
+  int rotation;
+} struct_message;
+
+struct_message incomingData;
+
 // Fungsi untuk menjalankan perintah motor
-void handleCommand(String cmd) {
+void handleCommand(String cmd, int rot) {
   cmd.trim();
   cmd.toUpperCase();
 
@@ -30,28 +43,30 @@ void handleCommand(String cmd) {
     digitalWrite(relayMotorKanan, HIGH);
     Serial.println("RIGHT");
 
-  } else if (cmd.startsWith("ROTATE:")) {
-    String val = cmd.substring(7);
-    int angle = val.toInt();
-    Serial.print("ROTATE Angle: ");
-    Serial.println(angle);
-    // Tambah kontrol servo di sini jika perlu
-
   } else {
     digitalWrite(relayMotorKiri, HIGH);
     digitalWrite(relayMotorKanan, HIGH);
     Serial.println("STOP");
   }
+
+  // Kendalikan servo dengan nilai rotasi
+  Serial.print("Set Servo to: ");
+  Serial.println(rot);
+  myServo.write(rot);
 }
 
-// Callback untuk menerima data ESP-NOW
-void onReceiveData(uint8_t *mac, uint8_t *incomingData, uint8_t len) {
-  char buf[100] = {0};
-  memcpy(buf, incomingData, len);
-  String cmd(buf);
-  Serial.print("Received: ");
+// Callback untuk menerima data dari ESP-NOW
+void onReceiveData(uint8_t *mac, uint8_t *incoming, uint8_t len) {
+  memcpy(&incomingData, incoming, sizeof(incomingData));
+  String cmd(incomingData.command);
+  int rot = incomingData.rotation;
+
+  Serial.print("Received Command: ");
   Serial.println(cmd);
-  handleCommand(cmd);
+  Serial.print("Received Rotation: ");
+  Serial.println(rot);
+
+  handleCommand(cmd, rot);
 }
 
 void setup() {
@@ -63,11 +78,14 @@ void setup() {
   digitalWrite(relayMotorKiri, HIGH);
   digitalWrite(relayMotorKanan, HIGH);
 
-  // Setup WiFi mode
+  // Setup servo
+  myServo.attach(servoPin);
+  myServo.write(90);  // Awal di tengah
+
+  // Setup WiFi dan ESP-NOW
   WiFi.mode(WIFI_STA);
   WiFi.disconnect();
 
-  // Inisialisasi ESP-NOW
   if (esp_now_init() != 0) {
     Serial.println("ESP-NOW init failed");
     return;
@@ -80,5 +98,5 @@ void setup() {
 }
 
 void loop() {
-  // Tidak perlu apa-apa di loop
+  // Tidak perlu isi loop
 }
