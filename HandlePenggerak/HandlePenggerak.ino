@@ -10,15 +10,18 @@ const int relayMotorKanan = 4;  // D2
 const int servoPin = 15;  // D8
 Servo myServo;
 
-// Struktur data yang diterima dari transmitter
+// Struktur data dari control_remote
 typedef struct struct_message {
   char command[10];
   int rotation;
+  int btnForwardState;
+  int btnMonitoringState;
+  int btnLeftState;
+  int btnRightState;
 } struct_message;
 
 struct_message incomingData;
 
-// Fungsi untuk menjalankan perintah motor
 void handleCommand(String cmd, int rot) {
   cmd.trim();
   cmd.toUpperCase();
@@ -49,13 +52,12 @@ void handleCommand(String cmd, int rot) {
     Serial.println("STOP");
   }
 
-  // Kendalikan servo dengan nilai rotasi
   Serial.print("Set Servo to: ");
   Serial.println(rot);
   myServo.write(rot);
 }
 
-// Callback untuk menerima data dari ESP-NOW
+// Callback ESP-NOW
 void onReceiveData(uint8_t *mac, uint8_t *incoming, uint8_t len) {
   memcpy(&incomingData, incoming, sizeof(incomingData));
   String cmd(incomingData.command);
@@ -66,23 +68,28 @@ void onReceiveData(uint8_t *mac, uint8_t *incoming, uint8_t len) {
   Serial.print("Received Rotation: ");
   Serial.println(rot);
 
+  // Proses motor & servo
   handleCommand(cmd, rot);
+
+  // Kirim status monitoring ke Sensor_dgn_MQTT melalui UART
+  if (incomingData.btnMonitoringState == LOW) {
+    Serial.println("1");  // Tombol monitoring ditekan
+  } else {
+    Serial.println("0");  // Tidak ditekan
+  }
 }
 
 void setup() {
   Serial.begin(9600);
 
-  // Setup pin relay
   pinMode(relayMotorKiri, OUTPUT);
   pinMode(relayMotorKanan, OUTPUT);
   digitalWrite(relayMotorKiri, HIGH);
   digitalWrite(relayMotorKanan, HIGH);
 
-  // Setup servo
   myServo.attach(servoPin);
-  myServo.write(90);  // Awal di tengah
+  myServo.write(90);  // Servo awal
 
-  // Setup WiFi dan ESP-NOW
   WiFi.mode(WIFI_STA);
   WiFi.disconnect();
 
@@ -98,5 +105,5 @@ void setup() {
 }
 
 void loop() {
-  // Tidak perlu isi loop
+  // Kosong
 }
