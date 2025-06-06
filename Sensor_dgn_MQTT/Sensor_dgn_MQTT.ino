@@ -3,8 +3,8 @@
 #include <PubSubClient.h> // Library MQTT Client
 
 // --- Konfigurasi Wi-Fi ---
-const char *ssid = "anthonysan";    // Nama Wi-FI
-const char *password = "intiboga99";    // Password wi-Fi
+const char *ssid = "Aga";    // Nama Wi-FI
+const char *password = "agoel123";    // Password wi-Fi
 
 // --- Konfigurasi MQTT Broker ---
 const char *mqtt_broker = "broker.emqx.io"; // GANTI DENGAN IP BROKER MQTT ANDA (misal "192.168.1.100")
