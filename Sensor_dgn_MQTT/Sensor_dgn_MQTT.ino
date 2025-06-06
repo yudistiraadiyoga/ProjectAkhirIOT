@@ -3,11 +3,11 @@
 #include <PubSubClient.h> // Library MQTT Client
 
 // --- Konfigurasi Wi-Fi ---
-const char *ssid = "Aga";     // Nama Wi-FI
+const char *ssid = "Aga";              // Nama Wi-FI
 const char *password = "agoel123";     // Password wi-Fi
 
 // --- Konfigurasi MQTT Broker ---
-const char *mqtt_broker = "broker.emqx.io";
+const char *mqtt_broker = "broker.emqx.io"; // Ganti dengan IP Broker
 const char *topic_publish = "71220830"; // Topik untuk mempublikasikan data sensor 
 const char *mqtt_username = ""; // KOSONGKAN "" JIKA TIDAK ADA USERNAME/PASSWORD
 const char *mqtt_password = ""; // KOSONGKAN "" JIKA TIDAK ADA USERNAME/PASSWORD
@@ -25,7 +25,7 @@ DHT dht(DHTPIN, DHTTYPE);
 
 // --- Konfigurasi Sensor Ultrasonik HC-SR04 ---
 const int trigPin = 5; // D1 (GPIO5) - Pin Trigger sensor
-const int echoPin = 4; // D2 (GPIO4) - Pin Echo sensor 
+const int echoPin = 4; // D2 (GPIO4) - Pin Echo sensor
 
 // --- Konfigurasi Buzzer ---
 const int buzzerPin = 14; // D5 (GPIO14) - Pin Digital yang terhubung ke buzzer
@@ -39,8 +39,12 @@ const unsigned long sendInterval = 1000; // Kirim data setiap 1 detik (1000 mili
 
 char jsonBuffer[100]; // Meningkatkan ukuran buffer untuk keamanan
 
-// --- Variabel Baru untuk Kontrol Database ---
+// --- Variabel untuk Kontrol Database dari Serial (dengan Debouncing) ---
 bool sendToDatabase = true; // Default: kirim ke database (1)
+int incomingBtnState = -1; // Status tombol terbaru yang diterima dari serial (-1: invalid, 0: off, 1: on)
+int lastKnownBtnState = -1; // Status tombol terakhir yang stabil dan diproses
+unsigned long lastStateChangeTime = 0; // Waktu terakhir status tombol stabil berubah
+const unsigned long serialDebounceDelay = 150; // Debounce delay untuk serial (sedikit lebih besar)
 
 // --- Fungsi untuk Koneksi Wi-Fi ---
 void setup_wifi() {
@@ -98,17 +102,43 @@ void loop() {
   }
   client.loop();
 
+  // --- Baca dan Debounce data dari Serial ---
   while (Serial.available()) {
     char incomingChar = Serial.read();
+    
+    // Perbarui incomingBtnState hanya jika menerima '0' atau '1'
     if (incomingChar == '0') {
-      sendToDatabase = false;
-      Serial.println("Menerima '0': Pengiriman DB dinonaktifkan.");
+      incomingBtnState = 0;
     } else if (incomingChar == '1') {
-      sendToDatabase = true;
-      Serial.println("Menerima '1': Pengiriman DB diaktifkan.");
+      incomingBtnState = 1;
     }
   }
 
+  // Logika debouncing:
+  if (incomingBtnState != -1) { // Jika ada nilai baru yang valid (0 atau 1)
+    if (incomingBtnState != lastKnownBtnState) {
+        // Jika ada perubahan dari status yang diketahui, reset timer
+        lastStateChangeTime = millis();
+        lastKnownBtnState = incomingBtnState; // Simpan sebagai kandidat status baru
+    }
+
+    // Jika kandidat status sudah stabil lebih dari debounceDelay
+    if ((millis() - lastStateChangeTime) >= serialDebounceDelay) {
+        // Hanya update sendToDatabase jika status yang stabil berbeda dari status saat ini
+        if ((lastKnownBtnState == 0 && sendToDatabase == true) || 
+            (lastKnownBtnState == 1 && sendToDatabase == false)) {
+            
+            sendToDatabase = (lastKnownBtnState == 1); // Set sendToDatabase sesuai lastKnownBtnState
+
+            Serial.print("Status DB: ");
+            Serial.print(sendToDatabase ? "Aktif" : "Nonaktif");
+            Serial.print(" (Diterima stabil: ");
+            Serial.print(lastKnownBtnState);
+            Serial.println(")");
+        }
+    }
+  }
+  
   unsigned long currentMillis = millis();
 
   if (currentMillis - lastSendTime >= sendInterval) {
@@ -150,25 +180,12 @@ void loop() {
       digitalWrite(buzzerPin, LOW);  // Matikan buzzer
       }
 
-    snprintf(jsonBuffer, sizeof(jsonBuffer), 
-             "{\"temperature\":%.2f,\"humidity\":%.2f,\"distance\":%d}", 
-             t, h, distance);
-
-    // --- Publikasikan Data ke MQTT Broker ---
-    if (client.publish(topic_publish, jsonBuffer)) {
-      Serial.print("MQTT JSON terkirim ke ");
-      Serial.print(topic_publish);
-      Serial.print(": ");
-      Serial.println(jsonBuffer); // Tetap menampilkan JSON yang dikirim untuk verifikasi
-    } else {
-      Serial.println("Gagal mengirim data MQTT.");
-    }
-
+    // jsonBuffer 
     snprintf(jsonBuffer, sizeof(jsonBuffer), 
              "{\"temperature\":%.2f,\"humidity\":%.2f,\"distance\":%d,\"sendToDB\":%s}", 
-             t, h, distance, sendToDatabase ? "true" : "false"); // Menambahkan "sendToDB"
+             t, h, distance, sendToDatabase ? "true" : "false");
 
-    // Kirim ulang pesan MQTT yang sudah diperbarui dengan flag sendToDB
+    // Kirim pesan MQTT yang sudah diperbarui dengan flag sendToDB
     if (client.publish(topic_publish, jsonBuffer)) {
       Serial.print("MQTT JSON (dengan DB flag) terkirim ke ");
       Serial.print(topic_publish);
