@@ -6,14 +6,18 @@ uint8_t mac_slave[] = {0xF4, 0xCF, 0xA2, 0x75, 0x64, 0x0E};  // Slave MAC addres
 
 // Struktur data yang akan dikirim
 typedef struct struct_message {
-  char command[10];  // Perintah kontrol (FORWARD, BACKWARD, etc.)
+  char command[10];  // Perintah kontrol (FORWARD, LEFT, RIGHT, STOP, MONITORING)
   int rotation;      // Nilai rotasi dari potensiometer
+  int btnForwardState; // Status tombol Forward
+  int btnMonitoringState; // Status tombol Monitoring
+  int btnLeftState; // Status tombol Left
+  int btnRightState; // Status tombol Right
 } struct_message;
 
 struct_message myData;  // Data yang akan dikirim
 
 int btnForward = 5;
-int btnBackward = 4;
+int btnMonitoring = 4;
 int btnRight = 0;
 int btnLeft = 2;
 int pot = A0;
@@ -33,7 +37,7 @@ void setup() {
 
   // Set pin mode untuk tombol
   pinMode(btnForward, INPUT_PULLUP);
-  pinMode(btnBackward, INPUT_PULLUP);
+  pinMode(btnMonitoring, INPUT_PULLUP);
   pinMode(btnLeft, INPUT_PULLUP);
   pinMode(btnRight, INPUT_PULLUP);
   pinMode(pot, INPUT);
@@ -73,8 +77,9 @@ void loop() {
   // Tentukan perintah berdasarkan tombol yang ditekan
   if (digitalRead(btnForward) == LOW) {
     strcpy(myData.command, "FORWARD");
-  } else if (digitalRead(btnBackward) == LOW) {
-    strcpy(myData.command, "BACKWARD");
+  } else if (digitalRead(btnMonitoring) == LOW) {
+    strcpy(myData.command, "MONITORING");
+    Serial.println("Monitoring activated. Sending full sensor data...");
   } else if (digitalRead(btnLeft) == LOW) {
     strcpy(myData.command, "LEFT");
   } else if (digitalRead(btnRight) == LOW) {
@@ -83,11 +88,23 @@ void loop() {
     strcpy(myData.command, "STOP");  // Jika tidak ada tombol yang ditekan
   }
 
-  // Menampilkan perintah yang dikirimkan
-  Serial.println(myData.command);
-
-  // Set nilai rotasi dalam struktur data
+  // Set nilai rotasi dan status tombol dalam struktur data
   myData.rotation = rotation;
+  myData.btnForwardState = digitalRead(btnForward);
+  myData.btnMonitoringState = digitalRead(btnMonitoring);
+  myData.btnLeftState = digitalRead(btnLeft);
+  myData.btnRightState = digitalRead(btnRight);
+
+  // Menampilkan perintah dan status tombol yang dikirimkan
+  Serial.println("Command: " + String(myData.command));
+  Serial.print("Forward Btn: ");
+  Serial.println(myData.btnForwardState);
+  Serial.print("Monitoring Btn: ");
+  Serial.println(myData.btnMonitoringState);
+  Serial.print("Left Btn: ");
+  Serial.println(myData.btnLeftState);
+  Serial.print("Right Btn: ");
+  Serial.println(myData.btnRightState);
 
   // Kirim data ke slave menggunakan ESP-NOW
   int result = esp_now_send(mac_slave, (uint8_t *)&myData, sizeof(myData));
@@ -109,5 +126,5 @@ void loop() {
   Serial.println(ESP.getFreeHeap());
 
   // Tambahkan delay untuk mengatur frekuensi pengiriman
-  delay(100);  // Mengirim data setiap 2 detik
+  delay(100);  // Mengirim data setiap 0.1 detik
 }
