@@ -45,7 +45,7 @@ int ldrValue;  // Nilai pembacaan dari LDR (0-1023)
 unsigned long lastSendTime = 0;
 const unsigned long sendInterval = 1000; // Kirim data setiap 1 detik (1000 milidetik)
 
-char jsonBuffer[150]; // Meningkatkan ukuran buffer untuk keamanan, karena ada data LDR dan LED sekarang
+char jsonBuffer[150]; // Buffer JSON
 
 // --- Variabel untuk Kontrol Database dari Serial (dengan Debouncing) ---
 bool sendToDatabase = true; // Default: kirim ke database (1)
@@ -89,20 +89,20 @@ void reconnect_mqtt() {
 }
 
 void setup() {
-  Serial.begin(9600); // Inisialisasi Serial untuk komunikasi ke Monitor PC DAN ke ESP lain
+  Serial.begin(9600); // Inisialisasi Serial
   Serial.println("Sistem Sensor ESP8266 Siap!");
 
   dht.begin();
   pinMode(trigPin, OUTPUT);
   pinMode(echoPin, INPUT);
-  pinMode(buzzerPin, OUTPUT);     // Menetapkan pin buzzer sebagai OUTPUT
-  digitalWrite(buzzerPin, LOW);   // Pastikan buzzer mati saat startup
+  pinMode(buzzerPin, OUTPUT);     // Pin buzzer sebagai OUTPUT
+  digitalWrite(buzzerPin, LOW);   // Buzzer mati saat startup
 
-  pinMode(ledPin1, OUTPUT);       // Menetapkan pin LED 1 sebagai OUTPUT
-  digitalWrite(ledPin1, LOW);     // Pastikan LED 1 mati saat startup
+  pinMode(ledPin1, OUTPUT);       // Pin LED1 sebagai OUTPUT
+  digitalWrite(ledPin1, LOW);     // LED1 mati saat startup
 
-  pinMode(ledPin2, OUTPUT);       // Menetapkan pin LED 2 sebagai OUTPUT
-  digitalWrite(ledPin2, LOW);     // Pastikan LED 2 mati saat startup
+  pinMode(ledPin2, OUTPUT);       // Pin LED2 sebagai OUTPUT
+  digitalWrite(ledPin2, LOW);     // LED2 mati saat startup
 
   setup_wifi();
   client.setServer(mqtt_broker, mqtt_port);
@@ -193,7 +193,7 @@ void loop() {
     Serial.print("Nilai LDR: ");
     Serial.println(ldrValue);
 
-    // --- Kontrol LED berdasarkan nilai LDR (Contoh Logika) ---
+    // --- Kontrol LED berdasarkan nilai LDR ---
     if (ldrValue < 300) { 
       digitalWrite(ledPin1, HIGH); 
       digitalWrite(ledPin2, HIGH); 
@@ -211,7 +211,7 @@ void loop() {
     bool led1State = digitalRead(ledPin1);
     bool led2State = digitalRead(ledPin2);
 
-    // --- Publikasikan Data ke MQTT Broker dengan flag sendToDB, LDR, dan status LED ---
+    // --- Publikasikan Data ke MQTT Broker ---
     snprintf(jsonBuffer, sizeof(jsonBuffer), 
              "{\"temperature\":%.2f,\"humidity\":%.2f,\"distance\":%d,\"ldr\":%d,\"led1Status\":%d,\"led2Status\":%d,\"sendToDB\":%s}", 
              t, h, distance, ldrValue, led1State, led2State, sendToDatabase ? "true" : "false");
@@ -225,7 +225,7 @@ void loop() {
       Serial.println("Gagal mengirim data MQTT.");
     }
 
-    // --- Cetak Data yang Lebih Mudah Dibaca di Serial Monitor (Hanya untuk debugging) ---
+    // --- Cetak Data Debugging ---
     Serial.println("--- Debug Output Sensor_dgn_MQTT ---");
     Serial.print("Suhu: ");
     Serial.print(t, 2);
@@ -242,11 +242,13 @@ void loop() {
     Serial.println(led1State ? "ON" : "OFF");
     Serial.print("LED 2 Status: ");
     Serial.println(led2State ? "ON" : "OFF");
-    Serial.println("Status Kirim DB: ");
+    Serial.print("Status Kirim DB: ");
     Serial.println(sendToDatabase ? "Aktif" : "Nonaktif");
     Serial.println("--------------------");
 
-    Serial.print("PING:"); // Menambahkan prefix agar bisa diidentifikasi jika dibaca
-    Serial.println(distance); // Mengirim nilai jarak diikuti newline
+    // --- Kirim jarak sensor HC-SR04 lewat serial TX sebagai 2 byte mentah ---
+    Serial.write(distance);
+    Serial.println(distance);
+    
   }
 }

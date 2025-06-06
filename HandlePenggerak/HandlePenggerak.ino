@@ -2,6 +2,8 @@
 #include <espnow.h>
 #include <Servo.h>
 
+int distance;
+
 // --- Pin Relay Motor ---
 const int relayMotorKiri = 5;   // D1
 const int relayMotorKanan = 4;  // D2
@@ -18,13 +20,13 @@ typedef struct struct_message {
 
 struct_message incomingData;
 
-// --- Serial Buffer untuk data jarak ---
-String serialBuffer = "";
-int lastReceivedDistance = -1;
-
 // --- State penghindaran otomatis ---
 bool autoAvoid = false;
-bool belokKiri = true;  // Bergantian kiri-kanan
+bool belokKiri = true;
+
+// --- Buffer pembacaan data serial ---
+uint8_t serialBuf[2];
+uint8_t serialIndex = 0;
 
 void handleCommand(String cmd, int rot) {
   cmd.trim();
@@ -72,7 +74,6 @@ void onReceiveData(uint8_t *mac, uint8_t *incoming, uint8_t len) {
   Serial.print("Received Rotation: ");
   Serial.println(rot);
 
-  // Hanya eksekusi jika tidak dalam mode hindar
   if (!autoAvoid) {
     handleCommand(cmd, rot);
   }
@@ -107,49 +108,37 @@ void setup() {
 }
 
 void loop() {
-  // --- Baca jarak dari Serial ---
-  while (Serial.available()) {
-    char c = Serial.read();
-    if (c == '\n') {
-      serialBuffer.trim();
-      if (serialBuffer.length() > 0) {
-        int dist = serialBuffer.toInt();
-        if (dist > 0 && dist < 500) {
-          lastReceivedDistance = dist;
+  // Baca data jarak dari Serial (int dikirim sebagai 2 byte)
+  while (Serial.available() >= 2) {
+    distance = Serial.read();
 
-          Serial.print("Jarak Diterima: ");
-          Serial.print(dist);
-          Serial.println(" cm");
+    Serial.print("Jarak diterima (int): ");
+    Serial.print(distance);
+    Serial.println(" cm");
 
-          if (dist < 10) {
-            autoAvoid = true;
+    if (distance < 10 && distance > 0) {
+      autoAvoid = true;
 
-            // Belok kiri atau kanan
-            if (belokKiri) {
-              digitalWrite(relayMotorKiri, HIGH);
-              digitalWrite(relayMotorKanan, LOW);
-              Serial.println("AUTO: BEL0K KIRI");
-            } else {
-              digitalWrite(relayMotorKiri, LOW);
-              digitalWrite(relayMotorKanan, HIGH);
-              Serial.println("AUTO: BEL0K KANAN");
-            }
-
-            belokKiri = !belokKiri;
-
-            delay(500);  // Tunggu sebentar setelah belok
-            digitalWrite(relayMotorKiri, HIGH);
-            digitalWrite(relayMotorKanan, HIGH);
-            Serial.println("AUTO: STOP");
-            delay(300);
-
-            autoAvoid = false;  // Kembali ke kontrol ESP-NOW
-          }
-        }
+      // Belok kiri atau kanan
+      if (belokKiri) {
+        digitalWrite(relayMotorKiri, HIGH);
+        digitalWrite(relayMotorKanan, LOW);
+        Serial.println("AUTO: BELOK KIRI");
+      } else {
+        digitalWrite(relayMotorKiri, LOW);
+        digitalWrite(relayMotorKanan, HIGH);
+        Serial.println("AUTO: BELOK KANAN");
       }
-      serialBuffer = "";  // Reset buffer
-    } else {
-      serialBuffer += c;  // Tambah ke buffer
+
+      belokKiri = !belokKiri;
+
+      delay(500);
+      digitalWrite(relayMotorKiri, HIGH);
+      digitalWrite(relayMotorKanan, HIGH);
+      Serial.println("AUTO: STOP");
+      delay(300);
+
+      autoAvoid = false;
     }
   }
 }
