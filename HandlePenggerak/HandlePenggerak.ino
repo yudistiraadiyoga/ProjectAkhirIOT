@@ -2,25 +2,29 @@
 #include <espnow.h>
 #include <Servo.h>
 
-// Pin relay motor
+// --- Pin Relay Motor ---
 const int relayMotorKiri = 5;   // D1
 const int relayMotorKanan = 4;  // D2
 
-// Servo pin
+// --- Servo ---
 const int servoPin = 15;  // D8
 Servo myServo;
 
-// Struktur data dari control_remote
+// --- Struktur ESP-NOW ---
 typedef struct struct_message {
   char command[10];
   int rotation;
-  int btnForwardState;
-  int btnMonitoringState;
-  int btnLeftState;
-  int btnRightState;
 } struct_message;
 
 struct_message incomingData;
+
+// --- Serial Buffer untuk data jarak ---
+String serialBuffer = "";
+int lastReceivedDistance = -1;
+
+// --- State penghindaran otomatis ---
+bool autoAvoid = false;
+bool belokKiri = true;  // Bergantian kiri-kanan
 
 void handleCommand(String cmd, int rot) {
   cmd.trim();
@@ -68,28 +72,27 @@ void onReceiveData(uint8_t *mac, uint8_t *incoming, uint8_t len) {
   Serial.print("Received Rotation: ");
   Serial.println(rot);
 
-  // Proses motor & servo
-  handleCommand(cmd, rot);
-
-  // Kirim status monitoring ke Sensor_dgn_MQTT melalui UART
-  if (incomingData.btnMonitoringState == LOW) {
-    Serial.println("1");  // Tombol monitoring ditekan
-  } else {
-    Serial.println("0");  // Tidak ditekan
+  // Hanya eksekusi jika tidak dalam mode hindar
+  if (!autoAvoid) {
+    handleCommand(cmd, rot);
   }
 }
 
 void setup() {
   Serial.begin(9600);
+  Serial.println("HandlePenggerak Siap...");
 
+  // Motor
   pinMode(relayMotorKiri, OUTPUT);
   pinMode(relayMotorKanan, OUTPUT);
   digitalWrite(relayMotorKiri, HIGH);
   digitalWrite(relayMotorKanan, HIGH);
 
+  // Servo
   myServo.attach(servoPin);
-  myServo.write(90);  // Servo awal
+  myServo.write(90);
 
+  // ESP-NOW
   WiFi.mode(WIFI_STA);
   WiFi.disconnect();
 
@@ -100,10 +103,53 @@ void setup() {
 
   esp_now_set_self_role(ESP_NOW_ROLE_SLAVE);
   esp_now_register_recv_cb(onReceiveData);
-
   Serial.println("ESP-NOW Receiver siap...");
 }
 
 void loop() {
-  // Kosong
+  // --- Baca jarak dari Serial ---
+  while (Serial.available()) {
+    char c = Serial.read();
+    if (c == '\n') {
+      serialBuffer.trim();
+      if (serialBuffer.length() > 0) {
+        int dist = serialBuffer.toInt();
+        if (dist > 0 && dist < 500) {
+          lastReceivedDistance = dist;
+
+          Serial.print("Jarak Diterima: ");
+          Serial.print(dist);
+          Serial.println(" cm");
+
+          if (dist < 10) {
+            autoAvoid = true;
+
+            // Belok kiri atau kanan
+            if (belokKiri) {
+              digitalWrite(relayMotorKiri, HIGH);
+              digitalWrite(relayMotorKanan, LOW);
+              Serial.println("AUTO: BEL0K KIRI");
+            } else {
+              digitalWrite(relayMotorKiri, LOW);
+              digitalWrite(relayMotorKanan, HIGH);
+              Serial.println("AUTO: BEL0K KANAN");
+            }
+
+            belokKiri = !belokKiri;
+
+            delay(500);  // Tunggu sebentar setelah belok
+            digitalWrite(relayMotorKiri, HIGH);
+            digitalWrite(relayMotorKanan, HIGH);
+            Serial.println("AUTO: STOP");
+            delay(300);
+
+            autoAvoid = false;  // Kembali ke kontrol ESP-NOW
+          }
+        }
+      }
+      serialBuffer = "";  // Reset buffer
+    } else {
+      serialBuffer += c;  // Tambah ke buffer
+    }
+  }
 }
