@@ -3,11 +3,11 @@
 #include <PubSubClient.h> // Library MQTT Client
 
 // --- Konfigurasi Wi-Fi ---
-const char *ssid = "Aga";    // Nama Wi-FI
-const char *password = "agoel123";    // Password wi-Fi
+const char *ssid = "Aga";     // Nama Wi-FI
+const char *password = "agoel123";     // Password wi-Fi
 
 // --- Konfigurasi MQTT Broker ---
-const char *mqtt_broker = "broker.emqx.io"; // GANTI DENGAN IP BROKER MQTT ANDA (misal "192.168.1.100")
+const char *mqtt_broker = "broker.emqx.io";
 const char *topic_publish = "71220830"; // Topik untuk mempublikasikan data sensor 
 const char *mqtt_username = ""; // KOSONGKAN "" JIKA TIDAK ADA USERNAME/PASSWORD
 const char *mqtt_password = ""; // KOSONGKAN "" JIKA TIDAK ADA USERNAME/PASSWORD
@@ -24,8 +24,8 @@ PubSubClient client(espClient);
 DHT dht(DHTPIN, DHTTYPE);
 
 // --- Konfigurasi Sensor Ultrasonik HC-SR04 ---
-const int trigPin = 5; // D1 (GPIO13) - Pin Trigger sensor
-const int echoPin = 4; // D2 (GPIO12) - Pin Echo sensor
+const int trigPin = 5; // D1 (GPIO5) - Pin Trigger sensor
+const int echoPin = 4; // D2 (GPIO4) - Pin Echo sensor 
 
 // --- Konfigurasi Buzzer ---
 const int buzzerPin = 14; // D5 (GPIO14) - Pin Digital yang terhubung ke buzzer
@@ -39,6 +39,8 @@ const unsigned long sendInterval = 1000; // Kirim data setiap 1 detik (1000 mili
 
 char jsonBuffer[100]; // Meningkatkan ukuran buffer untuk keamanan
 
+// --- Variabel Baru untuk Kontrol Database ---
+bool sendToDatabase = true; // Default: kirim ke database (1)
 
 // --- Fungsi untuk Koneksi Wi-Fi ---
 void setup_wifi() {
@@ -96,6 +98,17 @@ void loop() {
   }
   client.loop();
 
+  while (Serial.available()) {
+    char incomingChar = Serial.read();
+    if (incomingChar == '0') {
+      sendToDatabase = false;
+      Serial.println("Menerima '0': Pengiriman DB dinonaktifkan.");
+    } else if (incomingChar == '1') {
+      sendToDatabase = true;
+      Serial.println("Menerima '1': Pengiriman DB diaktifkan.");
+    }
+  }
+
   unsigned long currentMillis = millis();
 
   if (currentMillis - lastSendTime >= sendInterval) {
@@ -130,7 +143,7 @@ void loop() {
       }
     }
 
-    if (distance != -1 && distance < 10) {
+    if (distance != -1 && distance < 10) { // Jika jarak valid dan kurang dari 10 cm
       digitalWrite(buzzerPin, HIGH); // Nyalakan buzzer
       Serial.println("Jarak kurang dari 10 cm! BUZZER ON!");
     } else {
@@ -151,6 +164,20 @@ void loop() {
       Serial.println("Gagal mengirim data MQTT.");
     }
 
+    snprintf(jsonBuffer, sizeof(jsonBuffer), 
+             "{\"temperature\":%.2f,\"humidity\":%.2f,\"distance\":%d,\"sendToDB\":%s}", 
+             t, h, distance, sendToDatabase ? "true" : "false"); // Menambahkan "sendToDB"
+
+    // Kirim ulang pesan MQTT yang sudah diperbarui dengan flag sendToDB
+    if (client.publish(topic_publish, jsonBuffer)) {
+      Serial.print("MQTT JSON (dengan DB flag) terkirim ke ");
+      Serial.print(topic_publish);
+      Serial.print(": ");
+      Serial.println(jsonBuffer);
+    } else {
+      Serial.println("Gagal mengirim data MQTT dengan DB flag.");
+    }
+
     // --- Cetak Data yang Lebih Mudah Dibaca di Serial Monitor (Hanya untuk debugging) ---
     Serial.println("--- Debug Output ---");
     Serial.print("Suhu: ");
@@ -162,6 +189,8 @@ void loop() {
     Serial.print("Jarak: ");
     Serial.print(distance);
     Serial.println(" cm");
+    Serial.println("Status Kirim DB: ");
+    Serial.println(sendToDatabase ? "Aktif" : "Nonaktif");
     Serial.println("--------------------");
   }
 }
