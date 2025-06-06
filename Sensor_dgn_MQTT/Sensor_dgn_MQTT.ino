@@ -3,8 +3,8 @@
 #include <PubSubClient.h> // Library MQTT Client
 
 // --- Konfigurasi Wi-Fi ---
-const char *ssid = "anthonysan";    // Nama Wi-FI
-const char *password = "intiboga99";    // Password wi-Fi
+const char *ssid = "";    // Nama Wi-FI (jangan lupa diisi)
+const char *password = "";    // Password wi-Fi (jangan lupa diisi)
 
 // --- Konfigurasi MQTT Broker ---
 const char *mqtt_broker = "broker.emqx.io"; // GANTI DENGAN IP BROKER MQTT ANDA (misal "192.168.1.100")
@@ -26,6 +26,9 @@ DHT dht(DHTPIN, DHTTYPE);
 // --- Konfigurasi Sensor Ultrasonik HC-SR04 ---
 const int trigPin = 5; // D1 (GPIO13) - Pin Trigger sensor
 const int echoPin = 4; // D2 (GPIO12) - Pin Echo sensor
+
+// --- Konfigurasi Buzzer ---
+const int buzzerPin = 14; // D5 (GPIO14) - Pin Digital yang terhubung ke buzzer
 
 // --- Variabel Global ---
 long duration; // Durasi pulsa suara untuk sensor HC-SR04
@@ -79,6 +82,8 @@ void setup() {
   dht.begin();
   pinMode(trigPin, OUTPUT);
   pinMode(echoPin, INPUT);
+  pinMode(buzzerPin, OUTPUT); // Menetapkan pin buzzer sebagai OUTPUT
+  digitalWrite(buzzerPin, LOW); // Pastikan buzzer mati saat startup
 
   setup_wifi();
   client.setServer(mqtt_broker, mqtt_port);
@@ -124,6 +129,13 @@ void loop() {
         distance = -1;
       }
     }
+
+    if (distance != -1 && distance < 10) { // Jika jarak valid dan kurang dari 10 cm
+      digitalWrite(buzzerPin, HIGH); // Nyalakan buzzer
+      Serial.println("Jarak kurang dari 10 cm! BUZZER ON!");
+    } else {
+      digitalWrite(buzzerPin, LOW);  // Matikan buzzer
+      }
 
     snprintf(jsonBuffer, sizeof(jsonBuffer), 
              "{\"temperature\":%.2f,\"humidity\":%.2f,\"distance\":%d}", 
