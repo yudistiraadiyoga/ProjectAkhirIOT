@@ -3,8 +3,8 @@
 #include <PubSubClient.h> // Library MQTT Client
 
 // --- Konfigurasi Wi-Fi ---
-const char *ssid = "";    // Nama Wi-FI (jangan lupa diisi)
-const char *password = "";    // Password wi-Fi (jangan lupa diisi)
+const char *ssid = "anthonysan";    // Nama Wi-FI
+const char *password = "intiboga99";    // Password wi-Fi
 
 // --- Konfigurasi MQTT Broker ---
 const char *mqtt_broker = "broker.emqx.io"; // GANTI DENGAN IP BROKER MQTT ANDA (misal "192.168.1.100")
@@ -130,7 +130,7 @@ void loop() {
       }
     }
 
-    if (distance != -1 && distance < 10) { // Jika jarak valid dan kurang dari 10 cm
+    if (distance != -1 && distance < 10) {
       digitalWrite(buzzerPin, HIGH); // Nyalakan buzzer
       Serial.println("Jarak kurang dari 10 cm! BUZZER ON!");
     } else {
