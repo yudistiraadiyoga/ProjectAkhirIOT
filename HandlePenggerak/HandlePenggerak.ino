@@ -1,94 +1,102 @@
 #include <ESP8266WiFi.h>
-#include <PubSubClient.h>
+#include <espnow.h>
+#include <Servo.h>
 
-// Ganti dengan informasi WiFi dan MQTT kamu
-const char* ssid = "Aga";
-const char* password = "iniwifiku";
+// Pin relay motor
+const int relayMotorKiri = 5;   // D1
+const int relayMotorKanan = 4;  // D2
 
-const char *mqtt_broker = "broker.emqx.io";
-const char *mqtt_username = "qwerty";
-const char *mqtt_password = "public";
-const int mqtt_port = 1883;
+// Servo pin
+const int servoPin = 15;  // D8
+Servo myServo;
 
-WiFiClient espClient;
-PubSubClient client(espClient);
+// Struktur data yang diterima dari transmitter
+typedef struct struct_message {
+  char command[10];
+  int rotation;
+} struct_message;
 
-// Pin relay
-const int relayMotorKiri = D1;
-const int relayMotorKanan = D2;
+struct_message incomingData;
 
-// Fungsi kendali arah
-void handleArah(String arah) {
-  arah.toUpperCase();
-  if (arah == "FORWARD") {
+// Fungsi untuk menjalankan perintah motor
+void handleCommand(String cmd, int rot) {
+  cmd.trim();
+  cmd.toUpperCase();
+
+  if (cmd == "FORWARD") {
+    digitalWrite(relayMotorKiri, LOW);
+    digitalWrite(relayMotorKanan, LOW);
+    Serial.println("FORWARD");
+
+  } else if (cmd == "BACKWARD") {
     digitalWrite(relayMotorKiri, HIGH);
     digitalWrite(relayMotorKanan, HIGH);
-  } else if (arah == "BACKWARD") {
-    digitalWrite(relayMotorKiri, LOW);
-    digitalWrite(relayMotorKanan, LOW);
-  } else if (arah == "LEFT") {
-    digitalWrite(relayMotorKiri, LOW);
-    digitalWrite(relayMotorKanan, HIGH);
-  } else if (arah == "RIGHT") {
+    Serial.println("BACKWARD");
+
+  } else if (cmd == "LEFT") {
     digitalWrite(relayMotorKiri, HIGH);
     digitalWrite(relayMotorKanan, LOW);
-  } else { // STOP atau tidak dikenal
+    Serial.println("LEFT");
+
+  } else if (cmd == "RIGHT") {
     digitalWrite(relayMotorKiri, LOW);
-    digitalWrite(relayMotorKanan, LOW);
+    digitalWrite(relayMotorKanan, HIGH);
+    Serial.println("RIGHT");
+
+  } else {
+    digitalWrite(relayMotorKiri, HIGH);
+    digitalWrite(relayMotorKanan, HIGH);
+    Serial.println("STOP");
   }
 
-  Serial.println("Arah: " + arah);
+  // Kendalikan servo dengan nilai rotasi
+  Serial.print("Set Servo to: ");
+  Serial.println(rot);
+  myServo.write(rot);
 }
 
-// Callback saat menerima pesan MQTT
-void callback(char* topic, byte* payload, unsigned int length) {
-  String pesan = "";
-  for (unsigned int i = 0; i < length; i++) {
-    pesan += (char)payload[i];
-  }
-  Serial.print("Pesan diterima: ");
-  Serial.println(pesan);
-  handleArah(pesan);
-}
+// Callback untuk menerima data dari ESP-NOW
+void onReceiveData(uint8_t *mac, uint8_t *incoming, uint8_t len) {
+  memcpy(&incomingData, incoming, sizeof(incomingData));
+  String cmd(incomingData.command);
+  int rot = incomingData.rotation;
 
-// Reconnect MQTT
-void reconnect() {
-  while (!client.connected()) {
-    Serial.print("Menghubungkan ke MQTT...");
-    if (client.connect("ESP8266_PENGGERAK")) {
-      Serial.println("Terhubung");
-      client.subscribe("rc/control");
-    } else {
-      Serial.print("Gagal, rc=");
-      Serial.print(client.state());
-      Serial.println(" coba lagi dalam 5 detik...");
-      delay(5000);
-    }
-  }
+  Serial.print("Received Command: ");
+  Serial.println(cmd);
+  Serial.print("Received Rotation: ");
+  Serial.println(rot);
+
+  handleCommand(cmd, rot);
 }
 
 void setup() {
-  Serial.begin(115200);
+  Serial.begin(9600);
 
+  // Setup pin relay
   pinMode(relayMotorKiri, OUTPUT);
   pinMode(relayMotorKanan, OUTPUT);
-  handleArah("STOP");
+  digitalWrite(relayMotorKiri, HIGH);
+  digitalWrite(relayMotorKanan, HIGH);
 
-  WiFi.begin(ssid, password);
-  Serial.print("Menghubungkan WiFi...");
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(500);
-    Serial.print(".");
+  // Setup servo
+  myServo.attach(servoPin);
+  myServo.write(90);  // Awal di tengah
+
+  // Setup WiFi dan ESP-NOW
+  WiFi.mode(WIFI_STA);
+  WiFi.disconnect();
+
+  if (esp_now_init() != 0) {
+    Serial.println("ESP-NOW init failed");
+    return;
   }
-  Serial.println("\nWiFi terhubung");
 
-  client.setServer(mqtt_server, 1883);
-  client.setCallback(callback);
+  esp_now_set_self_role(ESP_NOW_ROLE_SLAVE);
+  esp_now_register_recv_cb(onReceiveData);
+
+  Serial.println("ESP-NOW Receiver siap...");
 }
 
 void loop() {
-  if (!client.connected()) {
-    reconnect();
-  }
-  client.loop();
+  // Tidak perlu isi loop
 }
