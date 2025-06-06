@@ -1,94 +1,84 @@
 #include <ESP8266WiFi.h>
-#include <PubSubClient.h>
+#include <espnow.h>
 
-// Ganti dengan informasi WiFi dan MQTT kamu
-const char* ssid = "Aga";
-const char* password = "iniwifiku";
+// Pin relay motor
+const int relayMotorKiri = 5;   // D1
+const int relayMotorKanan = 4;  // D2
 
-const char *mqtt_broker = "broker.emqx.io";
-const char *mqtt_username = "qwerty";
-const char *mqtt_password = "public";
-const int mqtt_port = 1883;
+// Fungsi untuk menjalankan perintah motor
+void handleCommand(String cmd) {
+  cmd.trim();
+  cmd.toUpperCase();
 
-WiFiClient espClient;
-PubSubClient client(espClient);
+  if (cmd == "FORWARD") {
+    digitalWrite(relayMotorKiri, LOW);
+    digitalWrite(relayMotorKanan, LOW);
+    Serial.println("FORWARD");
 
-// Pin relay
-const int relayMotorKiri = D1;
-const int relayMotorKanan = D2;
-
-// Fungsi kendali arah
-void handleArah(String arah) {
-  arah.toUpperCase();
-  if (arah == "FORWARD") {
+  } else if (cmd == "BACKWARD") {
     digitalWrite(relayMotorKiri, HIGH);
     digitalWrite(relayMotorKanan, HIGH);
-  } else if (arah == "BACKWARD") {
-    digitalWrite(relayMotorKiri, LOW);
-    digitalWrite(relayMotorKanan, LOW);
-  } else if (arah == "LEFT") {
-    digitalWrite(relayMotorKiri, LOW);
-    digitalWrite(relayMotorKanan, HIGH);
-  } else if (arah == "RIGHT") {
+    Serial.println("BACKWARD");
+
+  } else if (cmd == "LEFT") {
     digitalWrite(relayMotorKiri, HIGH);
     digitalWrite(relayMotorKanan, LOW);
-  } else { // STOP atau tidak dikenal
+    Serial.println("LEFT");
+
+  } else if (cmd == "RIGHT") {
     digitalWrite(relayMotorKiri, LOW);
-    digitalWrite(relayMotorKanan, LOW);
-  }
+    digitalWrite(relayMotorKanan, HIGH);
+    Serial.println("RIGHT");
 
-  Serial.println("Arah: " + arah);
+  } else if (cmd.startsWith("ROTATE:")) {
+    String val = cmd.substring(7);
+    int angle = val.toInt();
+    Serial.print("ROTATE Angle: ");
+    Serial.println(angle);
+    // Tambah kontrol servo di sini jika perlu
+
+  } else {
+    digitalWrite(relayMotorKiri, HIGH);
+    digitalWrite(relayMotorKanan, HIGH);
+    Serial.println("STOP");
+  }
 }
 
-// Callback saat menerima pesan MQTT
-void callback(char* topic, byte* payload, unsigned int length) {
-  String pesan = "";
-  for (unsigned int i = 0; i < length; i++) {
-    pesan += (char)payload[i];
-  }
-  Serial.print("Pesan diterima: ");
-  Serial.println(pesan);
-  handleArah(pesan);
-}
-
-// Reconnect MQTT
-void reconnect() {
-  while (!client.connected()) {
-    Serial.print("Menghubungkan ke MQTT...");
-    if (client.connect("ESP8266_PENGGERAK")) {
-      Serial.println("Terhubung");
-      client.subscribe("rc/control");
-    } else {
-      Serial.print("Gagal, rc=");
-      Serial.print(client.state());
-      Serial.println(" coba lagi dalam 5 detik...");
-      delay(5000);
-    }
-  }
+// Callback untuk menerima data ESP-NOW
+void onReceiveData(uint8_t *mac, uint8_t *incomingData, uint8_t len) {
+  char buf[100] = {0};
+  memcpy(buf, incomingData, len);
+  String cmd(buf);
+  Serial.print("Received: ");
+  Serial.println(cmd);
+  handleCommand(cmd);
 }
 
 void setup() {
-  Serial.begin(115200);
+  Serial.begin(9600);
 
+  // Setup pin relay
   pinMode(relayMotorKiri, OUTPUT);
   pinMode(relayMotorKanan, OUTPUT);
-  handleArah("STOP");
+  digitalWrite(relayMotorKiri, HIGH);
+  digitalWrite(relayMotorKanan, HIGH);
 
-  WiFi.begin(ssid, password);
-  Serial.print("Menghubungkan WiFi...");
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(500);
-    Serial.print(".");
+  // Setup WiFi mode
+  WiFi.mode(WIFI_STA);
+  WiFi.disconnect();
+
+  // Inisialisasi ESP-NOW
+  if (esp_now_init() != 0) {
+    Serial.println("ESP-NOW init failed");
+    return;
   }
-  Serial.println("\nWiFi terhubung");
 
-  client.setServer(mqtt_server, 1883);
-  client.setCallback(callback);
+  esp_now_set_self_role(ESP_NOW_ROLE_SLAVE);
+  esp_now_register_recv_cb(onReceiveData);
+
+  Serial.println("ESP-NOW Receiver siap...");
 }
 
 void loop() {
-  if (!client.connected()) {
-    reconnect();
-  }
-  client.loop();
+  // Tidak perlu apa-apa di loop
 }
