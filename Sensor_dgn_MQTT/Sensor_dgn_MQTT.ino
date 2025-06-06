@@ -1,18 +1,17 @@
 #include "DHT.h"         // Library untuk sensor DHTxx
-#include <ESP8266WiFi.h> // Untuk ESP8266. Jika ESP32, gunakan: #include <WiFi.h>
+#include <ESP8266WiFi.h> // Untuk ESP8266.
 #include <PubSubClient.h> // Library MQTT Client
-#include <ArduinoJson.h>  // Library untuk membuat payload JSON
 
 // --- Konfigurasi Wi-Fi ---
-const char *ssid = "";    // Diisi nama Wi-Fi
-const char *password = "";    // Diisi Password Wifi
+const char *ssid = "anthonysan";    // Nama Wi-FI
+const char *password = "intiboga99";    // Password wi-Fi
 
 // --- Konfigurasi MQTT Broker ---
 const char *mqtt_broker = "broker.emqx.io"; // GANTI DENGAN IP BROKER MQTT ANDA (misal "192.168.1.100")
-const char *topic_publish = "71220830"; // Topik untuk mempublikasikan data sensor (JSON)
-const int mqtt_port = 1883;
+const char *topic_publish = "71220830"; // Topik untuk mempublikasikan data sensor 
 const char *mqtt_username = ""; // KOSONGKAN "" JIKA TIDAK ADA USERNAME/PASSWORD
 const char *mqtt_password = ""; // KOSONGKAN "" JIKA TIDAK ADA USERNAME/PASSWORD
+const int mqtt_port = 1883;
 
 const char *mqtt_client_id_prefix = "esp8266-sensor-"; // ID unik, akan ditambah MAC address
 
@@ -21,12 +20,12 @@ PubSubClient client(espClient);
 
 // --- Konfigurasi Sensor DHTxx ---
 #define DHTPIN 2    // D4 (GPIO2) - Pin Digital yang terhubung ke sensor DHT
-#define DHTTYPE DHT11 // Tipe sensor DHT yang digunakan (DHT22 atau DHT11)
+#define DHTTYPE DHT22 // Tipe sensor DHT yang digunakan (DHT22 atau DHT11)
 DHT dht(DHTPIN, DHTTYPE);
 
 // --- Konfigurasi Sensor Ultrasonik HC-SR04 ---
-const int trigPin = 5; // D1 (GPIO5) - Pin Trigger sensor
-const int echoPin = 4; // D2 (GPIO4) - Pin Echo sensor
+const int trigPin = 5; // D1 (GPIO13) - Pin Trigger sensor
+const int echoPin = 4; // D2 (GPIO12) - Pin Echo sensor
 
 // --- Variabel Global ---
 long duration; // Durasi pulsa suara untuk sensor HC-SR04
@@ -35,17 +34,8 @@ int distance;  // Jarak dalam cm dari sensor HC-SR04
 unsigned long lastSendTime = 0;
 const unsigned long sendInterval = 1000; // Kirim data setiap 1 detik (1000 milidetik)
 
-// --- Fungsi Callback untuk Pesan MQTT yang Diterima (Opsional) ---
-void callback(char *topic, byte *payload, unsigned int length) {
-  Serial.print("Pesan MQTT diterima di topik: ");
-  Serial.println(topic);
-  Serial.print("Pesan: ");
-  for (int i = 0; i < length; i++) {
-    Serial.print((char)payload[i]);
-  }
-  Serial.println();
-  Serial.println("-----------------------");
-}
+char jsonBuffer[100]; // Meningkatkan ukuran buffer untuk keamanan
+
 
 // --- Fungsi untuk Koneksi Wi-Fi ---
 void setup_wifi() {
@@ -61,8 +51,6 @@ void setup_wifi() {
   }
 
   Serial.println("\nWiFi Terhubung");
-  // Serial.print("Alamat IP: "); // DIHAPUS: Tidak menampilkan IP di Serial Monitor
-  // Serial.println(WiFi.localIP()); // DIHAPUS: Tidak menampilkan IP di Serial Monitor
 }
 
 // --- Fungsi untuk Reconnect ke MQTT Broker ---
@@ -70,11 +58,11 @@ void reconnect_mqtt() {
   while (!client.connected()) {
     Serial.print("Mencoba koneksi MQTT...");
     String client_id = mqtt_client_id_prefix;
-    client_id += String(WiFi.macAddress()); // TETAP DIGUNAKAN untuk client ID unik
+    client_id += String(WiFi.macAddress()); 
 
     if (client.connect(client_id.c_str(), mqtt_username, mqtt_password)) {
       Serial.println("terhubung");
-      client.subscribe(topic_subscribe);
+      // client.subscribe(topic_subscribe); 
     } else {
       Serial.print("gagal, rc=");
       Serial.print(client.state());
@@ -85,7 +73,7 @@ void reconnect_mqtt() {
 }
 
 void setup() {
-  Serial.begin(115200); 
+  Serial.begin(9600); 
   Serial.println("Sistem Sensor ESP8266 Siap!");
 
   dht.begin();
@@ -94,7 +82,7 @@ void setup() {
 
   setup_wifi();
   client.setServer(mqtt_broker, mqtt_port);
-  client.setCallback(callback);
+  // client.setCallback(callback);
 }
 
 void loop() {
@@ -108,7 +96,7 @@ void loop() {
   if (currentMillis - lastSendTime >= sendInterval) {
     lastSendTime = currentMillis;
 
-    // --- Baca Data Sensor DHT22 ---
+    // --- Baca Data Sensor DHT ---
     float h = dht.readHumidity();
     float t = dht.readTemperature();
 
@@ -137,15 +125,9 @@ void loop() {
       }
     }
 
-    // --- Buat Payload JSON untuk MQTT ---
-    StaticJsonDocument<200> doc;
-    doc["temperature"] = t;
-    doc["humidity"] = h;
-    doc["distance"] = distance;
-    // doc["device_id"] = WiFi.macAddress(); // DIHAPUS: Tidak menyertakan MAC Address di payload JSON
-
-    char jsonBuffer[200];
-    serializeJson(doc, jsonBuffer);
+    snprintf(jsonBuffer, sizeof(jsonBuffer), 
+             "{\"temperature\":%.2f,\"humidity\":%.2f,\"distance\":%d}", 
+             t, h, distance);
 
     // --- Publikasikan Data ke MQTT Broker ---
     if (client.publish(topic_publish, jsonBuffer)) {
