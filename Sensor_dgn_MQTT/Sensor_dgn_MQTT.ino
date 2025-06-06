@@ -25,8 +25,8 @@ PubSubClient client(espClient);
 DHT dht(DHTPIN, DHTTYPE);
 
 // --- Konfigurasi Sensor Ultrasonik HC-SR04 ---
-const int trigPin = 5; // D1 (GPIO13) - Pin Trigger sensor
-const int echoPin = 4; // D2 (GPIO12) - Pin Echo sensor
+const int trigPin = 5; // D1 (GPIO5) - Pin Trigger sensor
+const int echoPin = 4; // D2 (GPIO4) - Pin Echo sensor
 
 // --- Variabel Global ---
 long duration; // Durasi pulsa suara untuk sensor HC-SR04
