@@ -3,11 +3,11 @@
 #include <PubSubClient.h> // Library MQTT Client
 
 // --- Konfigurasi Wi-Fi ---
-const char *ssid = "Aga";              // Nama Wi-FI
+const char *ssid = "Aga";     // Nama Wi-FI
 const char *password = "agoel123";     // Password wi-Fi
 
 // --- Konfigurasi MQTT Broker ---
-const char *mqtt_broker = "broker.emqx.io"; // Ganti dengan IP Broker
+const char *mqtt_broker = "broker.emqx.io"; // GANTI DENGAN IP BROKER MQTT ANDA
 const char *topic_publish = "71220830"; // Topik untuk mempublikasikan data sensor 
 const char *mqtt_username = ""; // KOSONGKAN "" JIKA TIDAK ADA USERNAME/PASSWORD
 const char *mqtt_password = ""; // KOSONGKAN "" JIKA TIDAK ADA USERNAME/PASSWORD
@@ -30,21 +30,29 @@ const int echoPin = 4; // D2 (GPIO4) - Pin Echo sensor
 // --- Konfigurasi Buzzer ---
 const int buzzerPin = 14; // D5 (GPIO14) - Pin Digital yang terhubung ke buzzer
 
+// --- Konfigurasi LDR (Light Dependent Resistor) ---
+const int ldrPin = A0; // A0 (GPIO17) - Pin Analog untuk LDR
+
+// --- Konfigurasi LED ---
+const int ledPin1 = 12; // D6 (GPIO12) - Pin Digital untuk LED 1
+const int ledPin2 = 13; // D7 (GPIO13) - Pin Digital untuk LED 2
+
 // --- Variabel Global ---
 long duration; // Durasi pulsa suara untuk sensor HC-SR04
 int distance;  // Jarak dalam cm dari sensor HC-SR04
+int ldrValue;  // Nilai pembacaan dari LDR (0-1023)
 
 unsigned long lastSendTime = 0;
 const unsigned long sendInterval = 1000; // Kirim data setiap 1 detik (1000 milidetik)
 
-char jsonBuffer[100]; // Meningkatkan ukuran buffer untuk keamanan
+char jsonBuffer[150]; // Meningkatkan ukuran buffer untuk keamanan, karena ada data LDR dan LED sekarang
 
 // --- Variabel untuk Kontrol Database dari Serial (dengan Debouncing) ---
 bool sendToDatabase = true; // Default: kirim ke database (1)
 int incomingBtnState = -1; // Status tombol terbaru yang diterima dari serial (-1: invalid, 0: off, 1: on)
 int lastKnownBtnState = -1; // Status tombol terakhir yang stabil dan diproses
 unsigned long lastStateChangeTime = 0; // Waktu terakhir status tombol stabil berubah
-const unsigned long serialDebounceDelay = 150; // Debounce delay untuk serial (sedikit lebih besar)
+const unsigned long serialDebounceDelay = 150; // Debounce delay untuk serial
 
 // --- Fungsi untuk Koneksi Wi-Fi ---
 void setup_wifi() {
@@ -71,7 +79,6 @@ void reconnect_mqtt() {
 
     if (client.connect(client_id.c_str(), mqtt_username, mqtt_password)) {
       Serial.println("terhubung");
-      // client.subscribe(topic_subscribe); 
     } else {
       Serial.print("gagal, rc=");
       Serial.print(client.state());
@@ -88,12 +95,17 @@ void setup() {
   dht.begin();
   pinMode(trigPin, OUTPUT);
   pinMode(echoPin, INPUT);
-  pinMode(buzzerPin, OUTPUT); // Menetapkan pin buzzer sebagai OUTPUT
-  digitalWrite(buzzerPin, LOW); // Pastikan buzzer mati saat startup
+  pinMode(buzzerPin, OUTPUT);     // Menetapkan pin buzzer sebagai OUTPUT
+  digitalWrite(buzzerPin, LOW);   // Pastikan buzzer mati saat startup
+
+  pinMode(ledPin1, OUTPUT);       // Menetapkan pin LED 1 sebagai OUTPUT
+  digitalWrite(ledPin1, LOW);     // Pastikan LED 1 mati saat startup
+
+  pinMode(ledPin2, OUTPUT);       // Menetapkan pin LED 2 sebagai OUTPUT
+  digitalWrite(ledPin2, LOW);     // Pastikan LED 2 mati saat startup
 
   setup_wifi();
   client.setServer(mqtt_broker, mqtt_port);
-  // client.setCallback(callback);
 }
 
 void loop() {
@@ -106,7 +118,6 @@ void loop() {
   while (Serial.available()) {
     char incomingChar = Serial.read();
     
-    // Perbarui incomingBtnState hanya jika menerima '0' atau '1'
     if (incomingChar == '0') {
       incomingBtnState = 0;
     } else if (incomingChar == '1') {
@@ -115,20 +126,17 @@ void loop() {
   }
 
   // Logika debouncing:
-  if (incomingBtnState != -1) { // Jika ada nilai baru yang valid (0 atau 1)
+  if (incomingBtnState != -1) { 
     if (incomingBtnState != lastKnownBtnState) {
-        // Jika ada perubahan dari status yang diketahui, reset timer
         lastStateChangeTime = millis();
-        lastKnownBtnState = incomingBtnState; // Simpan sebagai kandidat status baru
+        lastKnownBtnState = incomingBtnState; 
     }
 
-    // Jika kandidat status sudah stabil lebih dari debounceDelay
     if ((millis() - lastStateChangeTime) >= serialDebounceDelay) {
-        // Hanya update sendToDatabase jika status yang stabil berbeda dari status saat ini
         if ((lastKnownBtnState == 0 && sendToDatabase == true) || 
             (lastKnownBtnState == 1 && sendToDatabase == false)) {
             
-            sendToDatabase = (lastKnownBtnState == 1); // Set sendToDatabase sesuai lastKnownBtnState
+            sendToDatabase = (lastKnownBtnState == 1);
 
             Serial.print("Status DB: ");
             Serial.print(sendToDatabase ? "Aktif" : "Nonaktif");
@@ -173,26 +181,57 @@ void loop() {
       }
     }
 
-    if (distance != -1 && distance < 10) { // Jika jarak valid dan kurang dari 10 cm
-      digitalWrite(buzzerPin, HIGH); // Nyalakan buzzer
+    if (distance != -1 && distance < 10) { 
+      digitalWrite(buzzerPin, HIGH); 
       Serial.println("Jarak kurang dari 10 cm! BUZZER ON!");
     } else {
-      digitalWrite(buzzerPin, LOW);  // Matikan buzzer
-      }
+      digitalWrite(buzzerPin, LOW);  
+    }
 
-    // jsonBuffer 
+    // --- Baca Nilai LDR ---
+    ldrValue = analogRead(ldrPin);
+    Serial.print("Nilai LDR: ");
+    Serial.println(ldrValue);
+
+    // --- Kontrol LED berdasarkan nilai LDR (Contoh Logika) ---
+    // Anda bisa menyesuaikan threshold ini sesuai kebutuhan Anda
+    if (ldrValue < 300) { // Jika sangat gelap
+      digitalWrite(ledPin1, HIGH); // Nyalakan LED 1
+      digitalWrite(ledPin2, HIGH); // Nyalakan LED 2
+      Serial.println("Kondisi sangat gelap, kedua LED ON.");
+    } else if (ldrValue < 600) { // Jika agak gelap
+      digitalWrite(ledPin1, HIGH); // Nyalakan LED 1
+      digitalWrite(ledPin2, LOW);  // Matikan LED 2
+      Serial.println("Kondisi agak gelap, LED 1 ON, LED 2 OFF.");
+    } else { // Jika terang
+      digitalWrite(ledPin1, LOW);  // Matikan LED 1
+      digitalWrite(ledPin2, LOW);  // Matikan LED 2
+      Serial.println("Kondisi terang, kedua LED OFF.");
+    }
+
+    // --- Publikasikan Data ke MQTT Broker dengan flag sendToDB, LDR, dan status LED ---
+    // Menambahkan ldrValue, led1Status, dan led2Status ke JSON
     snprintf(jsonBuffer, sizeof(jsonBuffer), 
-             "{\"temperature\":%.2f,\"humidity\":%.2f,\"distance\":%d,\"sendToDB\":%s}", 
-             t, h, distance, sendToDatabase ? "true" : "false");
+             "{\"temperature\":%.2f,\"humidity\":%.2f,\"distance\":%d,\"ldr\":%d,\"led1Status\":%d,\"led2Status\":%d,\"sendToDB\":%s}", 
+             t, h, distance, ldrValue, digitalWrite(ledPin1,LOW) ? 0:1, digitalWrite(ledPin2,LOW) ? 0:1, sendToDatabase ? "true" : "false"); 
+             // Catatan: digitalWrite mengembalikan void, jadi harus baca pin state atau gunakan variabel bool
 
-    // Kirim pesan MQTT yang sudah diperbarui dengan flag sendToDB
+    // Perbaikan untuk mendapatkan status LED yang benar
+    bool led1State = digitalRead(ledPin1);
+    bool led2State = digitalRead(ledPin2);
+
+    snprintf(jsonBuffer, sizeof(jsonBuffer), 
+             "{\"temperature\":%.2f,\"humidity\":%.2f,\"distance\":%d,\"ldr\":%d,\"led1Status\":%d,\"led2Status\":%d,\"sendToDB\":%s}", 
+             t, h, distance, ldrValue, led1State, led2State, sendToDatabase ? "true" : "false");
+
+
     if (client.publish(topic_publish, jsonBuffer)) {
-      Serial.print("MQTT JSON (dengan DB flag) terkirim ke ");
+      Serial.print("MQTT JSON (lengkap) terkirim ke ");
       Serial.print(topic_publish);
       Serial.print(": ");
       Serial.println(jsonBuffer);
     } else {
-      Serial.println("Gagal mengirim data MQTT dengan DB flag.");
+      Serial.println("Gagal mengirim data MQTT.");
     }
 
     // --- Cetak Data yang Lebih Mudah Dibaca di Serial Monitor (Hanya untuk debugging) ---
@@ -206,6 +245,12 @@ void loop() {
     Serial.print("Jarak: ");
     Serial.print(distance);
     Serial.println(" cm");
+    Serial.print("LDR: ");
+    Serial.println(ldrValue);
+    Serial.print("LED 1 Status: ");
+    Serial.println(led1State ? "ON" : "OFF");
+    Serial.print("LED 2 Status: ");
+    Serial.println(led2State ? "ON" : "OFF");
     Serial.println("Status Kirim DB: ");
     Serial.println(sendToDatabase ? "Aktif" : "Nonaktif");
     Serial.println("--------------------");
