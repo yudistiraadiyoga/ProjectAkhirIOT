@@ -36,35 +36,47 @@ void handleCommand(String cmd, int rot) {
   cmd.trim();
   cmd.toUpperCase();
 
-  if (cmd == "FORWARD") {
-    digitalWrite(relayMotorKiri, LOW);
-    digitalWrite(relayMotorKanan, LOW);
-    Serial.println("FORWARD");
-
-  } else if (cmd == "BACKWARD") {
-    digitalWrite(relayMotorKiri, HIGH);
-    digitalWrite(relayMotorKanan, HIGH);
-    Serial.println("BACKWARD");
-
-  } else if (cmd == "LEFT") {
-    digitalWrite(relayMotorKiri, HIGH);
-    digitalWrite(relayMotorKanan, LOW);
-    Serial.println("LEFT");
-
-  } else if (cmd == "RIGHT") {
-    digitalWrite(relayMotorKiri, LOW);
-    digitalWrite(relayMotorKanan, HIGH);
-    Serial.println("RIGHT");
-
-  } else {
-    digitalWrite(relayMotorKiri, HIGH);
-    digitalWrite(relayMotorKanan, HIGH);
-    Serial.println("STOP");
-  }
-
   Serial.print("Set Servo to: ");
   Serial.println(rot);
   myServo.write(rot);
+  if (rot){
+    myServo.write(rot);
+    if (rot < 45){
+      digitalWrite(relayMotorKiri, HIGH);
+      digitalWrite(relayMotorKanan, LOW);
+      Serial.println("LEFT");
+    } else if (rot > 135){
+      digitalWrite(relayMotorKiri, LOW);
+      digitalWrite(relayMotorKanan, HIGH);
+      Serial.println("RIGHT");
+    } else {
+      if (cmd == "FORWARD") {
+        digitalWrite(relayMotorKiri, LOW);
+        digitalWrite(relayMotorKanan, LOW);
+        Serial.println("FORWARD");
+
+      } else if (cmd == "BACKWARD") {
+        digitalWrite(relayMotorKiri, HIGH);
+        digitalWrite(relayMotorKanan, HIGH);
+        Serial.println("BACKWARD");
+
+      } else if (cmd == "LEFT") {
+        digitalWrite(relayMotorKiri, HIGH);
+        digitalWrite(relayMotorKanan, LOW);
+        Serial.println("LEFT");
+
+      } else if (cmd == "RIGHT") {
+        digitalWrite(relayMotorKiri, LOW);
+        digitalWrite(relayMotorKanan, HIGH);
+        Serial.println("RIGHT");
+
+      } else {
+        digitalWrite(relayMotorKiri, HIGH);
+        digitalWrite(relayMotorKanan, HIGH);
+        Serial.println("STOP");
+      }
+    }
+  }
 }
 
 // Callback ESP-NOW
