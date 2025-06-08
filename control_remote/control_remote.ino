@@ -18,8 +18,8 @@ struct_message myData;  // Data yang akan dikirim
 
 int btnForward = 5;
 int btnMonitoring = 4;
-int btnRight = 0;
-int btnLeft = 2;
+int btnRight = 2;
+int btnLeft = 0;
 int pot = A0;
 
 void OnDataSent(uint8_t *mac_addr, uint8_t status) {

@@ -3,8 +3,8 @@
 #include <PubSubClient.h> // Library MQTT Client
 
 // --- Konfigurasi Wi-Fi ---
-const char *ssid = "Aga";     // Nama Wi-FI
-const char *password = "agoel123";     // Password wi-Fi
+const char *ssid = "WARUNG ABANK!";     // Nama Wi-FI
+const char *password = "ayamtelor";     // Password wi-Fi
 
 // --- Konfigurasi MQTT Broker ---
 const char *mqtt_broker = "broker.emqx.io"; // GANTI DENGAN IP BROKER MQTT ANDA
@@ -57,32 +57,34 @@ const unsigned long serialDebounceDelay = 150; // Debounce delay untuk serial
 // --- Fungsi untuk Koneksi Wi-Fi ---
 void setup_wifi() {
   delay(10);
-  Serial.print("Menghubungkan ke ");
-  Serial.println(ssid);
+  // Serial.print("Menghubungkan ke ");
+  // Serial.println(ssid);
 
   WiFi.begin(ssid, password);
 
   while (WiFi.status() != WL_CONNECTED) {
     delay(500);
-    Serial.print(".");
+    // Serial.print(".");
   }
 
-  Serial.println("\nWiFi Terhubung");
+  // Serial.println("\nWiFi Terhubung");
 }
 
 // --- Fungsi untuk Reconnect ke MQTT Broker ---
 void reconnect_mqtt() {
   while (!client.connected()) {
-    Serial.print("Mencoba koneksi MQTT...");
+    // Serial.print("Mencoba koneksi MQTT...");
     String client_id = mqtt_client_id_prefix;
     client_id += String(WiFi.macAddress()); 
 
     if (client.connect(client_id.c_str(), mqtt_username, mqtt_password)) {
-      Serial.println("terhubung");
+      // Serial.println("terhubung");
+      int a = 0;
     } else {
-      Serial.print("gagal, rc=");
-      Serial.print(client.state());
-      Serial.println(" coba lagi dalam 5 detik");
+      // Serial.print("gagal, rc=");
+      // Serial.print(client.state());
+      // Serial.println(" coba lagi dalam 5 detik");
+      int a = 0;
       delay(5000);
     }
   }
@@ -90,7 +92,7 @@ void reconnect_mqtt() {
 
 void setup() {
   Serial.begin(9600); // Inisialisasi Serial
-  Serial.println("Sistem Sensor ESP8266 Siap!");
+  // Serial.println("Sistem Sensor ESP8266 Siap!");
 
   dht.begin();
   pinMode(trigPin, OUTPUT);
@@ -138,11 +140,11 @@ void loop() {
             
             sendToDatabase = (lastKnownBtnState == 1);
 
-            Serial.print("Status DB: ");
-            Serial.print(sendToDatabase ? "Aktif" : "Nonaktif");
-            Serial.print(" (Diterima stabil: ");
-            Serial.print(lastKnownBtnState);
-            Serial.println(")");
+            // Serial.print("Status DB: ");
+            // Serial.print(sendToDatabase ? "Aktif" : "Nonaktif");
+            // Serial.print(" (Diterima stabil: ");
+            // Serial.print(lastKnownBtnState);
+            // Serial.println(")");
         }
     }
   }
@@ -159,7 +161,7 @@ void loop() {
     if (isnan(h) || isnan(t)) {
       h = -1.0;
       t = -1.0;
-      Serial.println(F("Gagal membaca dari sensor DHT!"));
+      // Serial.println(F("Gagal membaca dari sensor DHT!"));
     }
 
     // --- Baca Data Sensor HC-SR04 ---
@@ -173,7 +175,7 @@ void loop() {
 
     if (duration == 0) {
       distance = -1;
-      Serial.println("Error: Tidak ada gema diterima dari sensor Ping.");
+      // Serial.println("Error: Tidak ada gema diterima dari sensor Ping.");
     } else {
       distance = duration * 0.034 / 2;
       if (distance > 400 || distance <= 0) {
@@ -183,7 +185,7 @@ void loop() {
 
     if (distance != -1 && distance < 10) { 
       digitalWrite(buzzerPin, HIGH); 
-      Serial.println("Jarak kurang dari 10 cm! BUZZER ON!");
+      // Serial.println("Jarak kurang dari 10 cm! BUZZER ON!");
     } else {
       digitalWrite(buzzerPin, LOW);  
     }
@@ -194,18 +196,14 @@ void loop() {
     Serial.println(ldrValue);
 
     // --- Kontrol LED berdasarkan nilai LDR ---
-    if (ldrValue < 300) { 
+    if (ldrValue < 8) { 
       digitalWrite(ledPin1, HIGH); 
       digitalWrite(ledPin2, HIGH); 
-      Serial.println("Kondisi sangat gelap, kedua LED ON.");
-    } else if (ldrValue < 600) { 
-      digitalWrite(ledPin1, HIGH); 
-      digitalWrite(ledPin2, LOW);  
-      Serial.println("Kondisi agak gelap, LED 1 ON, LED 2 OFF.");
+      // Serial.println("Kondisi sangat gelap, kedua LED ON.");
     } else { 
       digitalWrite(ledPin1, LOW);  
       digitalWrite(ledPin2, LOW);  
-      Serial.println("Kondisi terang, kedua LED OFF.");
+      // Serial.println("Kondisi terang, kedua LED OFF.");
     }
 
     bool led1State = digitalRead(ledPin1);
@@ -217,38 +215,38 @@ void loop() {
              t, h, distance, ldrValue, led1State, led2State, sendToDatabase ? "true" : "false");
     
     if (client.publish(topic_publish, jsonBuffer)) {
-      Serial.print("MQTT JSON (lengkap) terkirim ke ");
-      Serial.print(topic_publish);
-      Serial.print(": ");
-      Serial.println(jsonBuffer);
+      // Serial.print("MQTT JSON (lengkap) terkirim ke ");
+      // Serial.print(topic_publish);
+      // Serial.print(": ");
+      // Serial.println(jsonBuffer);
+      int a = 0;
     } else {
-      Serial.println("Gagal mengirim data MQTT.");
+      // Serial.println("Gagal mengirim data MQTT.");
+      int a = 0;
     }
 
     // --- Cetak Data Debugging ---
-    Serial.println("--- Debug Output Sensor_dgn_MQTT ---");
-    Serial.print("Suhu: ");
-    Serial.print(t, 2);
-    Serial.println(" C");
-    Serial.print("Kelembaban: ");
-    Serial.print(h, 2);
-    Serial.println(" %");
-    Serial.print("Jarak: ");
-    Serial.print(distance);
-    Serial.println(" cm");
-    Serial.print("LDR: ");
-    Serial.println(ldrValue);
-    Serial.print("LED 1 Status: ");
-    Serial.println(led1State ? "ON" : "OFF");
-    Serial.print("LED 2 Status: ");
-    Serial.println(led2State ? "ON" : "OFF");
-    Serial.print("Status Kirim DB: ");
-    Serial.println(sendToDatabase ? "Aktif" : "Nonaktif");
-    Serial.println("--------------------");
+    // Serial.println("--- Debug Output Sensor_dgn_MQTT ---");
+    // Serial.print("Suhu: ");
+    // Serial.print(t, 2);
+    // Serial.println(" C");
+    // Serial.print("Kelembaban: ");
+    // Serial.print(h, 2);
+    // Serial.println(" %");
+    // Serial.print("Jarak: ");
+    // Serial.print(distance);
+    // Serial.println(" cm");
+    // Serial.print("LDR: ");
+    // Serial.println(ldrValue);
+    // Serial.print("LED 1 Status: ");
+    // Serial.println(led1State ? "ON" : "OFF");
+    // Serial.print("LED 2 Status: ");
+    // Serial.println(led2State ? "ON" : "OFF");
+    // Serial.print("Status Kirim DB: ");
+    // Serial.println(sendToDatabase ? "Aktif" : "Nonaktif");
+    // Serial.println("--------------------");
 
     // --- Kirim jarak sensor HC-SR04 lewat serial TX sebagai 2 byte mentah ---
     Serial.write(distance);
-    Serial.println(distance);
-    
   }
 }

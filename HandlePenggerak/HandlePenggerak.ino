@@ -16,6 +16,10 @@ Servo myServo;
 typedef struct struct_message {
   char command[10];
   int rotation;
+  int btnForwardState;
+  int btnMonitoringState;
+  int btnLeftState;
+  int btnRightState;
 } struct_message;
 
 struct_message incomingData;
@@ -76,6 +80,12 @@ void onReceiveData(uint8_t *mac, uint8_t *incoming, uint8_t len) {
 
   if (!autoAvoid) {
     handleCommand(cmd, rot);
+  }
+
+  if (incomingData.btnMonitoringState == LOW) {
+    Serial.println("1");  // Tombol monitoring ditekan
+  } else {
+    Serial.println("0");  // Tidak ditekan
   }
 }
 
