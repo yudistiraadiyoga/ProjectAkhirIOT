@@ -3,8 +3,8 @@
 #include <PubSubClient.h> // Library MQTT Client
 
 // --- Konfigurasi Wi-Fi ---
-const char *ssid = "WARUNG ABANK!";     // Nama Wi-FI
-const char *password = "ayamtelor";     // Password wi-Fi
+const char *ssid = "Aga";     // Nama Wi-FI
+const char *password = "agoel123";     // Password wi-Fi
 
 // --- Konfigurasi MQTT Broker ---
 const char *mqtt_broker = "broker.emqx.io"; // GANTI DENGAN IP BROKER MQTT ANDA
@@ -192,8 +192,8 @@ void loop() {
 
     // --- Baca Nilai LDR ---
     ldrValue = analogRead(ldrPin);
-    Serial.print("Nilai LDR: ");
-    Serial.println(ldrValue);
+    // Serial.print("Nilai LDR: ");
+    // Serial.println(ldrValue);
 
     // --- Kontrol LED berdasarkan nilai LDR ---
     if (ldrValue < 8) { 

@@ -26,7 +26,6 @@ struct_message incomingData;
 
 // --- State penghindaran otomatis ---
 bool autoAvoid = false;
-bool belokKiri = true;
 
 // --- Buffer pembacaan data serial ---
 uint8_t serialBuf[2];
@@ -38,44 +37,60 @@ void handleCommand(String cmd, int rot) {
 
   Serial.print("Set Servo to: ");
   Serial.println(rot);
+
+  // Debugging: Cek jika nilai rot dalam rentang yang valid untuk servo
+  if (rot < 0 || rot > 180) {
+    Serial.println("Invalid servo rotation value! Rotating to 90 degrees.");
+    rot = 90; // Pastikan servo tidak menerima nilai di luar rentang 0-180
+  }
   myServo.write(rot);
-  if (rot){
-    myServo.write(rot);
-    if (rot < 45){
-      digitalWrite(relayMotorKiri, HIGH);
-      digitalWrite(relayMotorKanan, LOW);
-      Serial.println("LEFT");
-    } else if (rot > 135){
-      digitalWrite(relayMotorKiri, LOW);
-      digitalWrite(relayMotorKanan, HIGH);
-      Serial.println("RIGHT");
-    } else {
-      if (cmd == "FORWARD") {
+  
+  if (cmd == "FORWARD") {
+    // Logika penghindaran otomatis saat FORWARD
+    if (distance < 10 && distance > 0) { // Jika jarak terlalu dekat, berhenti
+      autoAvoid = true;
+      Serial.println("Obstacles detected! Stopping motor...");
+
+      // Hentikan motor secara eksplisit
+      digitalWrite(relayMotorKiri, HIGH); // Matikan motor kiri
+      digitalWrite(relayMotorKanan, HIGH); // Matikan motor kanan
+      Serial.println("Motor stopped due to obstacle");
+
+      // Logika penghindaran jika ada objek
+      if (rot < 45) {
         digitalWrite(relayMotorKiri, LOW);
-        digitalWrite(relayMotorKanan, LOW);
-        Serial.println("FORWARD");
-
-      } else if (cmd == "BACKWARD") {
+        digitalWrite(relayMotorKanan, HIGH);  // Belok kiri
+        Serial.println("Turning LEFT to avoid obstacle");
+      } else if (rot > 135) {
         digitalWrite(relayMotorKiri, HIGH);
-        digitalWrite(relayMotorKanan, HIGH);
-        Serial.println("BACKWARD");
-
-      } else if (cmd == "LEFT") {
-        digitalWrite(relayMotorKiri, HIGH);
-        digitalWrite(relayMotorKanan, LOW);
-        Serial.println("LEFT");
-
-      } else if (cmd == "RIGHT") {
-        digitalWrite(relayMotorKiri, LOW);
-        digitalWrite(relayMotorKanan, HIGH);
-        Serial.println("RIGHT");
-
-      } else {
-        digitalWrite(relayMotorKiri, HIGH);
-        digitalWrite(relayMotorKanan, HIGH);
-        Serial.println("STOP");
+        digitalWrite(relayMotorKanan, LOW);  // Belok kanan
+        Serial.println("Turning RIGHT to avoid obstacle");
       }
+
+      myServo.write(rot); // Sesuaikan rotasi servo
+      autoAvoid = false;  // Mengakhiri penghindaran
+    } else {
+      // Jika tidak ada rintangan, maju ke depan
+      digitalWrite(relayMotorKiri, LOW);
+      digitalWrite(relayMotorKanan, LOW);
+      Serial.println("FORWARD");
     }
+  } else if (cmd == "BACKWARD") {
+    digitalWrite(relayMotorKiri, HIGH);
+    digitalWrite(relayMotorKanan, HIGH);
+    Serial.println("BACKWARD");
+  } else if (cmd == "LEFT") {
+    digitalWrite(relayMotorKiri, HIGH);
+    digitalWrite(relayMotorKanan, LOW);
+    Serial.println("LEFT");
+  } else if (cmd == "RIGHT") {
+    digitalWrite(relayMotorKiri, LOW);
+    digitalWrite(relayMotorKanan, HIGH);
+    Serial.println("RIGHT");
+  } else {
+    digitalWrite(relayMotorKiri, HIGH);
+    digitalWrite(relayMotorKanan, HIGH);
+    Serial.println("STOP");
   }
 }
 
@@ -85,10 +100,10 @@ void onReceiveData(uint8_t *mac, uint8_t *incoming, uint8_t len) {
   String cmd(incomingData.command);
   int rot = incomingData.rotation;
 
-  Serial.print("Received Command: ");
-  Serial.println(cmd);
-  Serial.print("Received Rotation: ");
-  Serial.println(rot);
+  // Serial.print("Received Command: ");
+  // Serial.println(cmd);
+  // Serial.print("Received Rotation: ");
+  // Serial.println(rot);
 
   if (!autoAvoid) {
     handleCommand(cmd, rot);
@@ -113,7 +128,7 @@ void setup() {
 
   // Servo
   myServo.attach(servoPin);
-  myServo.write(90);
+  myServo.write(90); // Atur servo ke posisi awal (90 derajat)
 
   // ESP-NOW
   WiFi.mode(WIFI_STA);
@@ -131,36 +146,11 @@ void setup() {
 
 void loop() {
   // Baca data jarak dari Serial (int dikirim sebagai 2 byte)
-  while (Serial.available() >= 2) {
-    distance = Serial.read();
+  while (Serial.available() > 0) {
+    distance = Serial.read(); // Ambil jarak dari sensor
 
     Serial.print("Jarak diterima (int): ");
     Serial.print(distance);
     Serial.println(" cm");
-
-    if (distance < 10 && distance > 0) {
-      autoAvoid = true;
-
-      // Belok kiri atau kanan
-      if (belokKiri) {
-        digitalWrite(relayMotorKiri, HIGH);
-        digitalWrite(relayMotorKanan, LOW);
-        Serial.println("AUTO: BELOK KIRI");
-      } else {
-        digitalWrite(relayMotorKiri, LOW);
-        digitalWrite(relayMotorKanan, HIGH);
-        Serial.println("AUTO: BELOK KANAN");
-      }
-
-      belokKiri = !belokKiri;
-
-      delay(500);
-      digitalWrite(relayMotorKiri, HIGH);
-      digitalWrite(relayMotorKanan, HIGH);
-      Serial.println("AUTO: STOP");
-      delay(300);
-
-      autoAvoid = false;
-    }
   }
 }
